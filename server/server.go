@@ -181,7 +181,6 @@ func getContentType(request *http.Request, fP string ) string {
 	}
 	if _, err := os.Stat(fP); os.IsNotExist(err) {
 		// Respond with a 404 "Not Found" code.
-		// respondNotFound(conn)
 		contentType = "notFound"
 	}
 	return contentType
