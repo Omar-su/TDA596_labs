@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var port string
@@ -53,10 +54,12 @@ func main() {
 
 func handleConnection(connection net.Conn) {
 
-	defer func() {
+	defer func(connection net.Conn) {
 		connection.Close()
 		<-semaphore
-	}()
+	}(connection)
+
+	time.Sleep( 30* time.Second)
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
@@ -67,7 +70,7 @@ func handleConnection(connection net.Conn) {
 	switch request.Method {
 	case "GET":
 		fmt.Println("GET request received")
-		getHandler(request,connection)
+		getHandler(request, connection)
 
 	case "POST":
 		fmt.Println("POST request received")
@@ -77,56 +80,54 @@ func handleConnection(connection net.Conn) {
 		responseStatus := "501 Not Implemented"
 		contentType := "text/html"
 		fileContent := []byte("Not Implemented \n")
-		responseHandler(connection,responseStatus,contentType, fileContent)
+		responseHandler(connection, responseStatus, contentType, fileContent)
 
 	}
 
 }
 
-func getHandler(request *http.Request, connection net.Conn) {	
+func getHandler(request *http.Request, connection net.Conn) {
 	var fileContent []byte
 	err := error(nil)
 	uri := request.RequestURI
 	fP := "." + uri // Assuming requested files are in the current directory.
-	
-	contentType := getContentType(request, fP) 
+
+	contentType := getContentType(request, fP)
 	var responseStatus string
-	switch contentType	{
+	switch contentType {
 
 	case "notFound":
 		responseStatus = "404 Not Found"
 		contentType = "text/html"
 		fileContent = []byte("Not Found \n")
-	
+
 	case "badRequest":
 		responseStatus = "400 Bad Request"
 		contentType = "text/html"
 		fileContent = []byte("Bad Request\n")
 
-	
-	default: 
+	default:
 		responseStatus = "200 OK"
 		fileContent, err = ioutil.ReadFile(fP)
 		if err != nil {
-			responseHandler(connection,"500 Internal Server Error","text/html", []byte("Internal Server Error\n"))
+			responseHandler(connection, "500 Internal Server Error", "text/html", []byte("Internal Server Error\n"))
 			fmt.Println(err)
 			return
 		}
-	
+
 	}
-	
-	
-	responseHandler(connection,responseStatus,contentType, fileContent)
+
+	responseHandler(connection, responseStatus, contentType, fileContent)
 }
 
 func postHandler(request *http.Request, connection net.Conn) {
-	
+
 	uri := request.RequestURI
 	fileName := getFileNameFromURL(uri)
 	localFile, err := os.Create(fileName)
 	if err != nil {
 		fmt.Println("Error creating local file:", err)
-		responseHandler(connection,"500 Internal Server Error","text/html", []byte("Internal Server Error\n"))
+		responseHandler(connection, "500 Internal Server Error", "text/html", []byte("Internal Server Error\n"))
 		return
 	}
 	defer localFile.Close()
@@ -135,11 +136,11 @@ func postHandler(request *http.Request, connection net.Conn) {
 	_, err = io.Copy(localFile, request.Body)
 	if err != nil {
 		fmt.Println("Error copying response to file:", err)
-		responseHandler(connection,"500 Internal Server Error","text/html", []byte("Internal Server Error\n"))
+		responseHandler(connection, "500 Internal Server Error", "text/html", []byte("Internal Server Error\n"))
 		return
 	}
 
-	responseHandler(connection,"201 Created","text/html", []byte("File saved as "+ fileName + "\n"))
+	responseHandler(connection, "201 Created", "text/html", []byte("File saved as "+fileName+"\n"))
 }
 
 func getFileNameFromURL(url string) string {
@@ -147,23 +148,22 @@ func getFileNameFromURL(url string) string {
 	return parts[len(parts)-1]
 }
 
-func responseHandler(connection net.Conn, responseStatus string, contentType string, content []byte ) {
-	response := "HTTP/1.1 "+ responseStatus + "\r\n" + 
+func responseHandler(connection net.Conn, responseStatus string, contentType string, content []byte) {
+	response := "HTTP/1.1 " + responseStatus + "\r\n" +
 		"Content-Type: " + contentType + "\r\n" +
-	"Content-Length: " + fmt.Sprintf("%d", len(content)) +"\r\n" + 
-	"\r\n" // Empty line separating headers and body..
-	
-	
+		"Content-Length: " + fmt.Sprintf("%d", len(content)) + "\r\n" +
+		"\r\n" // Empty line separating headers and body..
+
 	//Send headers followed by file content
 
 	connection.Write([]byte(response))
 	connection.Write(content)
 }
 
-func getContentType(request *http.Request, fP string ) string {
-	var contentType string 
+func getContentType(request *http.Request, fP string) string {
+	var contentType string
 	// Check if the requested file exists.
-	
+
 	extension := filepath.Ext(fP)
 	switch strings.ToLower(extension) {
 	case ".html":
@@ -173,11 +173,11 @@ func getContentType(request *http.Request, fP string ) string {
 	case ".gif":
 		contentType = "image/gif"
 	case ".jpeg", ".jpg":
-		contentType =  "image/jpeg"
+		contentType = "image/jpeg"
 	case ".css":
 		contentType = "text/css"
 	default:
-		return  "badRequest"
+		return "badRequest"
 	}
 	if _, err := os.Stat(fP); os.IsNotExist(err) {
 		// Respond with a 404 "Not Found" code.
