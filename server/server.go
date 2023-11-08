@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 var port string
@@ -59,7 +58,6 @@ func handleConnection(connection net.Conn) {
 		<-semaphore
 	}(connection)
 
-	time.Sleep( 30* time.Second)
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
@@ -87,6 +85,7 @@ func handleConnection(connection net.Conn) {
 }
 
 func getHandler(request *http.Request, connection net.Conn) {
+	fmt.Println("GET request received from the proxy")
 	var fileContent []byte
 	err := error(nil)
 	uri := request.RequestURI
@@ -116,7 +115,8 @@ func getHandler(request *http.Request, connection net.Conn) {
 		}
 
 	}
-
+	
+	fmt.Println("Response is ready to be sent")
 	responseHandler(connection, responseStatus, contentType, fileContent)
 }
 
@@ -155,9 +155,11 @@ func responseHandler(connection net.Conn, responseStatus string, contentType str
 		"\r\n" // Empty line separating headers and body..
 
 	//Send headers followed by file content
-
+	fmt.Println("Sending response")
 	connection.Write([]byte(response))
 	connection.Write(content)
+	fmt.Println("Snt response")
+
 }
 
 func getContentType(request *http.Request, fP string) string {

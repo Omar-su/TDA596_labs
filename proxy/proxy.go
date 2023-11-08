@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +13,9 @@ import (
 var port string
 
 const maxConnections int = 10
+var serverPort string
+var serverIp string
+var requestParam string
 
 var semaphore = make(chan struct{}, maxConnections)
 
@@ -59,6 +63,7 @@ func handleConnection(connection net.Conn) {
 		fmt.Println(err)
 		return
 	}
+	urlParser(request)
 	switch request.Method {
 	case "GET":
 		fmt.Println("GET request received")
@@ -73,38 +78,47 @@ func handleConnection(connection net.Conn) {
 	}
 }
 
-func getHandler(request  *http.Request, connection net.Conn) {
-	// url := request.RequestURI
-	//request.ParseForm()
-	fmt.Println("Printing request")
-	//print port and url 
-	fmt.Println(request.Host)
-
+func urlParser(request *http.Request) {
+	
 	// Split the port and the ip from the Host and save each in a variable
-	hostIp := strings.Split(request.Host, ":")
-	fmt.Println(hostIp[0])
-	fmt.Println(hostIp[1])
-	// Split the port and the ip from the Host and save each in a variable
-	// ip, host := strings.Split(request.Host, ":")
-
-	fmt.Println(request.URL)
+	hostUrl := strings.Split(request.Host, ":")
+	serverPort = hostUrl[1]
+	serverIp = hostUrl[0]
+	
+	fmt.Println(hostUrl[0])
+	fmt.Println(hostUrl[1])
+	
 	// Get the path from the URL
-	path := request.URL.Path 
-	fmt.Println(path)
-	// Create an HTTP GET request with the specified URL.
-	// req, err := http.NewRequest("GET", url, nil)
-	// if err != nil {
-	// 		fmt.Println("Error creating request:", err)
-	// 		return
-	// }
+	requestParam = request.URL.Path 
+	fmt.Println(requestParam)
 
-	// Send the GET request.
-	// res, err := client.Do(req)
-	// if err != nil {
-	// 		fmt.Println("Error sending request:", err)
-	// 		return
-	// }
 }
+
+func getHandler(request  *http.Request, connection net.Conn) {
+	
+	response, err := http.Get("http://" +serverIp + ":" + serverPort + requestParam)
+	fmt.Print(response)
+	
+	if err!= nil {
+        fmt.Println("Helllo this is error",err)
+        return
+	}
+
+	// Send response to client
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Print("body")
+
+	responseStatus := response.Status
+	contentType := response.Header.Get("Content-Type")
+	responseHandler(connection, responseStatus, contentType, body)
+	
+}
+
 
 func responseHandler(connection net.Conn, responseStatus string, contentType string, content []byte) {
 	response := "HTTP/1.1 " + responseStatus + "\r\n" +
@@ -113,7 +127,8 @@ func responseHandler(connection net.Conn, responseStatus string, contentType str
 		"\r\n" // Empty line separating headers and body..
 
 	//Send headers followed by file content
-
+	fmt.Println("Response is ready to be sent")
 	connection.Write([]byte(response))
 	connection.Write(content)
+	fmt.Println("Response sent")
 }
