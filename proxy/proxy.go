@@ -12,12 +12,15 @@ import (
 
 var port string
 
-const maxConnections int = 10
+//removed connection cap as we are already limiting the number of connections on the real server. Can reinclude if needed
+//const maxConnections int = 10
+
 var serverPort string
 var serverIp string
 var requestParam string
 
-var semaphore = make(chan struct{}, maxConnections)
+//removed connection cap as we are already limiting the number of connections on the real server. Can reinclude if needed
+//var semaphore = make(chan struct{}, maxConnections)
 
 func main() {
 	if len(os.Args) != 2 {
@@ -38,10 +41,11 @@ func main() {
 
 	for {
 
-		semaphore <- struct{}{}
+		//removed connection cap as we are already limiting the number of connections on the real server. Can reinclude if needed
+		//semaphore <- struct{}{}
 
 		connection, err := listener.Accept()
-		fmt.Println("Semaphore size: ", len(semaphore))
+
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -54,7 +58,8 @@ func main() {
 func handleConnection(connection net.Conn) {
 	defer func() {
 		connection.Close()
-		<-semaphore
+		//removed connection cap as we are already limiting the number of connections on the real server. Can reinclude if needed
+		//<-semaphore
 	}()
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
@@ -79,29 +84,29 @@ func handleConnection(connection net.Conn) {
 }
 
 func urlParser(request *http.Request) {
-	
+
 	// Split the port and the ip from the Host and save each in a variable
 	hostUrl := strings.Split(request.Host, ":")
 	serverPort = hostUrl[1]
 	serverIp = hostUrl[0]
-	
+
 	fmt.Println(hostUrl[0])
 	fmt.Println(hostUrl[1])
-	
+
 	// Get the path from the URL
-	requestParam = request.URL.Path 
+	requestParam = request.URL.Path
 	fmt.Println(requestParam)
 
 }
 
-func getHandler(request  *http.Request, connection net.Conn) {
-	
-	response, err := http.Get("http://" +serverIp + ":" + serverPort + requestParam)
+func getHandler(request *http.Request, connection net.Conn) {
+
+	response, err := http.Get("http://" + serverIp + ":" + serverPort + requestParam)
 	fmt.Print(response)
-	
-	if err!= nil {
-        fmt.Println("Helllo this is error",err)
-        return
+
+	if err != nil {
+		fmt.Println("Helllo this is error", err)
+		return
 	}
 
 	// Send response to client
@@ -116,9 +121,8 @@ func getHandler(request  *http.Request, connection net.Conn) {
 	responseStatus := response.Status
 	contentType := response.Header.Get("Content-Type")
 	responseHandler(connection, responseStatus, contentType, body)
-	
-}
 
+}
 
 func responseHandler(connection net.Conn, responseStatus string, contentType string, content []byte) {
 	response := "HTTP/1.1 " + responseStatus + "\r\n" +
