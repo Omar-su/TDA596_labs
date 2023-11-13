@@ -14,5 +14,5 @@ RUN go build -o serverexe ./server/server.go
 RUN go build -o proxyexe ./proxy/proxy.go
 
 # Specify the commands to run your binaries
-CMD ["./serverexe"]
+CMD ["./serverexe 8080 "]
 # or CMD ["./proxy"] depending on which one you want to run by default
