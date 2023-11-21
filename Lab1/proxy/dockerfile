@@ -1,0 +1,15 @@
+FROM golang:1.16
+
+WORKDIR /
+
+COPY . .
+
+
+RUN chmod +x /proxy.go
+
+RUN go build -o proxyexe ./proxy.go
+
+ENTRYPOINT [ "./proxyexe" ]
+
+
+CMD [ "8080 " ]
