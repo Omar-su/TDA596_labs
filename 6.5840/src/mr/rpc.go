@@ -25,8 +25,8 @@ type ExampleReply struct {
 }
 
 type WorkArgs struct {
-	WorkerdID int
-	// filesinmemory []string   maybe used  for distributed system , tell cordinator which files are in storage so he gives the worker a file that is  in storage
+	WorkerdID     int
+	FilesInMemory []string
 }
 
 type WorkReply struct {
@@ -34,6 +34,7 @@ type WorkReply struct {
 	TaskNum  int
 	File     string
 	NReduce  int //amount of reduce tasks to create from bucket
+	Nfiles   int //amount of files to reduce from
 }
 
 type ReportArgs struct {
