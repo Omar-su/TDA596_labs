@@ -7,18 +7,7 @@ import (
 	"log"
 	"net/rpc"
 	"os"
-	"sort"
-	"strings"
-	"time"
 )
-
-// for sorting by key.
-type ByKey []KeyValue
-
-// for sorting by key.
-func (a ByKey) Len() int           { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 //
 // Map functions return a slice of KeyValue.
@@ -58,31 +47,40 @@ func Worker(mapf func(string, string) []KeyValue,
 //
 func CallAskForWork(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-	for {
-		workArgs := WorkArgs{WorkerdID: 1}
-		workReply := WorkReply{}
 
-		ok := call("Coordinator.GiveWork", &workArgs, &workReply)
-		if ok {
-			fmt.Printf(workReply.File + "\n")
-		} else {
-			return //call failed, server done
+	//get all file names in directory that end in txt
+	files, err := ioutil.ReadDir("./")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var fileNames []string
+	for _, f := range files {
+		if f.Name()[len(f.Name())-3:] == "txt" {
+			fileNames = append(fileNames, f.Name())
 		}
+	}
 
-		fmt.Printf("reply.tasktype %s\n", workReply.TaskType)
-		fmt.Printf("reply.tasknum %v\n", workReply.TaskNum)
-		fmt.Printf("reply.file %s\n", workReply.File)
-		fmt.Printf("reply.nreduce %v\n", workReply.NReduce)
+	workArgs := WorkArgs{WorkerdID: 1, FilesInMemory: fileNames}
+	workReply := WorkReply{}
 
-		if workReply.TaskType == "map" {
-			processMapTask(mapf, reducef, workReply.File, workReply.NReduce, workReply.TaskNum)
-		} else if workReply.TaskType == "reduce" {
-			processReduceTask(reducef, workReply.File, workReply.TaskNum, workReply.Nfiles, mapf)
-		} else if workReply.TaskType == "wait" {
-			fmt.Printf("waiting for more work")
-			time.Sleep(1 * time.Second)
+	ok := call("Coordinator.GiveWork", &workArgs, &workReply)
+	if ok {
+		fmt.Printf(workReply.File)
+	} else {
+		fmt.Printf("does not work")
+	}
 
-		}
+	fmt.Printf("reply.tasktype %s\n", workReply.TaskType)
+	fmt.Printf("reply.tasknum %v\n", workReply.TaskNum)
+	fmt.Printf("reply.file %s\n", workReply.File)
+	fmt.Printf("reply.nreduce %v\n", workReply.NReduce)
+
+	if workReply.TaskType == "map" {
+		processMapTask(mapf, reducef, workReply.File, workReply.NReduce, workReply.TaskNum)
+	} else if workReply.TaskType == "reduce" {
+		processReduceTask(reducef, workReply.File, workReply.TaskNum)
+
 	}
 
 }
@@ -117,71 +115,7 @@ func processMapTask(mapf func(string, string) []KeyValue, reducef func(string, [
 	ReportWork("map", taskNum, true, mapf, reducef)
 }
 
-func processReduceTask(reducef func(string, []string) string, file string, taskNum int, nfiles int, mapf func(string, string) []KeyValue) {
-
-	//read all fles named mr-*-taskNum and append their content to an array called intermidiate
-
-	fmt.Println("reduce task start \n\n\n\n")
-	fmt.Println("Nfiles: ", nfiles)
-
-	var intermediate []KeyValue
-
-	for i := 0; i < nfiles; i++ {
-		filename := fmt.Sprintf("mr-%d-%d", i, taskNum)
-		file, err := os.Open(filename)
-		if err != nil {
-			log.Fatalf("cannot open %v", filename)
-		}
-		content, err := ioutil.ReadAll(file)
-		if err != nil {
-			log.Fatalf("cannot read %v", filename)
-		}
-		file.Close()
-
-		//split content by new line and append to intermediate
-		contentSplit := strings.Split(string(content), "\n")
-
-		fmt.Fprintln(os.Stderr, "contentSplit: ", contentSplit[1])
-
-		//remove empty string from end of content split
-		contentSplit = contentSplit[:len(contentSplit)-1]
-
-		for i := range contentSplit {
-			keyValueSplit := strings.Split(contentSplit[i], " ")
-			fmt.Fprintln(os.Stderr, "keyValueSplit: ", keyValueSplit[1])
-
-			intermediate = append(intermediate, KeyValue{keyValueSplit[0], keyValueSplit[1]})
-		}
-	}
-	fmt.Println("intermediate: \n\n\n", len(intermediate))
-	sort.Sort(ByKey(intermediate))
-	fmt.Println("sorted")
-
-	//call reduce on each distinct key in intermediate and print the result to mr-out-taskNum
-	oname := fmt.Sprintf("mr-out-%d", taskNum)
-	ofile, _ := os.Create(oname)
-	i := 0
-	fmt.Println("intermediate: ", len(intermediate))
-	for i < len(intermediate) {
-		j := i + 1
-		for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
-			j++
-		}
-		values := []string{}
-		for k := i; k < j; k++ {
-			values = append(values, intermediate[k].Value)
-		}
-		output := reducef(intermediate[i].Key, values)
-
-		// this is the correct format for each line of Reduce output.
-		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
-
-		i = j
-	}
-
-	ofile.Close()
-
-	ReportWork("reduce", taskNum, true, mapf, reducef)
+func processReduceTask(reducef func(string, []string) string, file string, taskNum int) {
 
 }
 
@@ -197,7 +131,8 @@ func ReportWork(taskType string, taskNum int, success bool, mapf func(string, st
 
 	ok := call("Coordinator.ReportWork", &args, &reply)
 	if ok {
-
+		// reply.Y should be 100.
+		fmt.Printf("reply.Y")
 	} else {
 		fmt.Printf("call failed!\n")
 	}
